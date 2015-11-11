@@ -1,0 +1,154 @@
+---
+title: "Reproduce.Rmd"
+output: html_document
+---
+Load the required libraries
+```{r echo=FALSE}
+library(dplyr)
+library(ggplot2)
+
+```
+Load the data from the file into mydf variable
+the file should be located in the default directory of R
+
+```{r}
+setwd("E:/r/reproduce/")
+data_row <- read.csv("activity.csv")
+```
+Remove NA from the dataset
+```{r}
+data <- data_row[ with (data_row, { !(is.na(steps)) } ), ]
+
+```
+
+Calculating the mean total number of steps taken per day
+- group the data by date and put the result in new variable
+- use summarise function to calculate the sum of the steps per day
+
+```{r}
+by_day <- group_by(data, date)
+steps_by_day <- summarise(by_day, total = sum(steps))
+steps_by_day
+
+```
+
+Make a histogram of the steps taken by day
+
+```{r}
+hist(steps_by_day$total, main="Histogram of total number of steps per day", 
+     xlab="Total number of steps in a day")
+```
+
+Calculate and report the mean and median of the total number of steps taken per day
+
+```{r}
+v_mean <- (mean(steps_by_day$steps))
+v_median <- factor(median(steps_by_day$steps))
+
+
+```
+Printing the mean
+```{r}
+v_mean
+```
+Printing the median
+```{r}
+v_median
+```
+Calculate the average daily activity pattern
+```{r}
+by_interval <- group_by(data, interval)
+steps_by_interval <- summarise(by_interval, steps = mean(steps))
+```
+Create a time series plot 
+```{r}
+plot(steps_by_interval$interval, steps_by_interval$steps, type='l', 
+     main="Average number of steps over all days", xlab="Interval", 
+     ylab="Average number of steps")
+```
+
+- find row with max of steps
+- find interval with this max
+```{r}
+max_steps_row <- which.max(steps_by_interval$steps)
+steps_by_interval[max_steps_row, ]
+```
+
+Imputing missing values
+Calculate and report the total number of missing values in the dataset
+```{r}
+sum(is.na(data_row))
+```
+
+Replacing NA's with the mean for that 5-minute interval.
+```{r}
+data_imputed <- data_row
+for (i in 1:nrow(data_imputed)) {
+  if (is.na(data_imputed$steps[i])) {
+    interval_value <- data_imputed$interval[i]
+    steps_value <- steps_by_interval[
+      steps_by_interval$interval == interval_value,]
+    data_imputed$steps[i] <- steps_value$steps
+  }
+}
+```
+
+Create new dataset df_imputed_steps_by_day which equals to data_row but without NA's. All NA's are replaced with mean of 5-minute interval.
+```{r}
+df_imputed_steps_by_day <- aggregate(steps ~ date, data_imputed, sum)
+head(df_imputed_steps_by_day)
+```
+Drawing the Histogram of total number of steps per day for the new Dataset 
+```{r}
+hist(df_imputed_steps_by_day$steps, main="Histogram of total number of steps per day (imputed)", 
+     xlab="Total number of steps in a day")
+```
+
+Get mean and median of imputed data
+1- mean
+```{r}
+mean(df_imputed_steps_by_day$steps)
+```
+2- median 
+```{r}
+median(df_imputed_steps_by_day$steps)
+```
+
+Get mean and median of original data
+1- mean
+```{r}
+mean(steps_by_day$total)
+```
+2- median 
+```{r}
+median(steps_by_day$total)
+```
+Mean value stays the same but there is slight difference in meadian value.
+
+
+Create a new factor variable in the dataset with two levels -- "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+```{r}
+data_imputed['type_of_day'] <- weekdays(as.Date(data_imputed$date))
+data_imputed$type_of_day[data_imputed$type_of_day  %in% c('Saturday','Sunday') ] <- "weekend"
+data_imputed$type_of_day[data_imputed$type_of_day != "weekend"] <- "weekday"
+```
+
+Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+```{r}
+# convert type_of_day from character to factor
+data_imputed$type_of_day <- as.factor(data_imputed$type_of_day)
+
+# calculate average steps by interval across all days
+df_imputed_steps_by_interval <- aggregate(steps ~ interval + type_of_day, data_imputed, mean)
+
+# creat a plot
+qplot(interval, 
+      steps, 
+      data = df_imputed_steps_by_interval, 
+      type = 'l', 
+      geom=c("line"),
+      xlab = "Interval", 
+      ylab = "Number of steps", 
+      main = "") +
+  facet_wrap(~ type_of_day, ncol = 1)
+```
